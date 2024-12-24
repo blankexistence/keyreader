@@ -52,8 +52,8 @@
         "fullscreen": false,
         "resizable": true,
         "title": "KeyReader",
-        "width": 400,
-        "height": 200,
+        "width": 300,
+        "height": 150,
         "decorations": false,
         "transparent": true
       }

@@ -3,7 +3,7 @@
 
 mod keyboard_listener;
 use std::thread;
-use tauri::Manager;
+use tauri::{Manager, PhysicalSize};
 
 #[derive(Clone, serde::Serialize)]
 struct Payload {
@@ -22,6 +22,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![greet])
         .setup(move |app| {
             let wv = app.get_window("main").unwrap();
+
+            // Set the minimum size for the window
+            wv.set_min_size(Some(PhysicalSize::new(375, 188))).unwrap();
 
             thread::spawn(move || {
                 keyboard_listener::run_listener(move |s: &str, s1: &str| {
