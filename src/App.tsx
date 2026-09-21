@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useLayoutEffect, useState, useRef } from "react"
 import { listen } from "@tauri-apps/api/event"
 import { appWindow } from "@tauri-apps/api/window"
 import Key from "./Key"
@@ -10,9 +10,13 @@ const shiftKeys = ["ShiftLeft", "ShiftRight"]
 const metaKeys = ["MetaLeft", "MetaRight"]
 const altKeys = ["Alt", "AltGr"]
 
+// Hard cap so the history can't grow forever; the real limit is measured (see useLayoutEffect)
+const MAX_KEYS = 50
+
 function App() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
-  const [maxChars, setMaxChars] = useState(2)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
   const [alphabeticKeys, setAlphabeticKeys] = useState<string[]>(["NONE"])
   const [modifierKeys, setModifierKeys] = useState([
     {
@@ -44,7 +48,7 @@ function App() {
       specialKeysObj.Esc,
     ].includes(message)
 
-  const updateTickers = (message: string, maxChars: number) => {
+  const updateTickers = (message: string) => {
 
     setAlphabeticKeys((prevTickers) => {
       const charCode = message.charCodeAt(0)
@@ -61,7 +65,8 @@ function App() {
         message = specialKeysObj.Esc
       }
 
-      if (charCode === 8) {
+      // Ctrl+Backspace makes Windows report DEL (0x7F) instead of BS (0x08)
+      if (charCode === 8 || charCode === 127) {
         message = specialKeysObj.Backspace
       }
 
@@ -84,10 +89,7 @@ function App() {
         newTickers = [...prevTickers, ...[message]]
       }
 
-      const currLen = newTickers.length
-      newTickers = currLen >= maxChars ? newTickers.slice(Math.floor(maxChars*0.2)) : newTickers
-
-      return newTickers
+      return newTickers.slice(-MAX_KEYS)
     })
   }
 
@@ -116,13 +118,13 @@ function App() {
       const { mode, message } = payload as { message: string; mode: string }
 
       if (mode === "Some") {
-        updateTickers(message, maxChars)
+        updateTickers(message)
         updateModifierActiveStatus(message, true)
       }
 
       if (mode === "KeyPress") {
         updateControlPressedStatus(message, true)
-        updateTickers(message, maxChars)
+        updateTickers(message)
         updateModifierActiveStatus(message, true)
       }
 
@@ -135,12 +137,19 @@ function App() {
     return () => {
       unlisten.then((stop) => stop())
     }
-  }, [windowWidth, maxChars])
+  }, [])
 
-  useEffect(() => {
-    setMaxChars(Math.floor(windowWidth/30))
-  }, [windowWidth])
-  
+  // Drop the oldest key until the row actually fits inside the box.
+  // Runs before paint, so the overflow is never visible.
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    const row = rowRef.current
+    if (!viewport || !row) return
+
+    if (row.offsetWidth > viewport.clientWidth && alphabeticKeys.length > 1) {
+      setAlphabeticKeys((keys) => keys.slice(1))
+    }
+  }, [alphabeticKeys, windowWidth])
 
   useEffect(() => {
     const handleResize = () => {
@@ -160,9 +169,13 @@ function App() {
           ✕
         </button>
         <div className={`tickers ${ windowWidth > 310 ? 'rounded-bl-3xl': '' }`}>
-          {alphabeticKeys.map((ticker, idx) => {
-            return <Key key={idx} ticker={ticker} />
-          })}
+          <div ref={viewportRef} className="ticker-viewport">
+            <div ref={rowRef} className="ticker-row">
+              {alphabeticKeys.map((ticker, idx) => {
+                return <Key key={idx} ticker={ticker} />
+              })}
+            </div>
+          </div>
         </div>
         <div className="ml-auto">
           <div className="modifier-keycaps w-[300px] max-w-[300px]">

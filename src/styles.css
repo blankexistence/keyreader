@@ -54,6 +54,14 @@ body {
   height: 100%;
 }
 
+.ticker-viewport {
+  @apply flex flex-1 min-w-0 justify-center overflow-hidden;
+}
+
+.ticker-row {
+  @apply flex flex-none whitespace-nowrap;
+}
+
 .ticker-container {
   @apply text-white overflow-hidden w-[200px] h-[100px] flex flex-col relative;
   height: 100vh;
